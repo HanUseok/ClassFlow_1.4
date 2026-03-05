@@ -1,92 +1,67 @@
-# ClassFlow 상태 전이 정의 (v1.0)
+﻿# ClassFlow 상태 전이 정의 (코드 기준 v2)
 
-## 1. Session 상태 (Debate)
+## 기준
+- Verified Date: 2026-03-05
+- 실제 구현 파일: `lib/mock-data.ts`, `hooks/use-session-flow.ts`, `lib/domain/session/index.ts`, `app/station/page.tsx`, `components/session/session-detail-page-content.tsx`
 
-| 현재 상태 | 이벤트 | 다음 상태 | 조건 | 실행 주체 |
-|---|---|---|---|---|
-| `draft` | 설정 검증 완료 | `ready` | 팀/슬롯/라운드 필수값 존재 | Teacher |
-| `ready` | 시작 | `live` | 입장 조건 충족 또는 `force_start=true` | Teacher |
-| `live` | 일시정지 | `paused` | 없음 | Teacher |
-| `paused` | 재개 | `live` | 없음 | Teacher |
-| `live`/`paused` | 종료 | `ended` | 없음 | Teacher |
-| `ended` | 재오픈 요청 | `ended` | 세션 상태는 유지, record window만 재오픈 | Teacher |
+## 1) Session 상태 전이
 
-입장 조건:
-- desk 역할 `active` 1개 이상.
-- 활성 team 수만큼 `team:*` 역할 `active` 1개 이상.
+### 상태 집합
+- `Pending`
+- `Live`
+- `Ended`
 
-## 2. Session 상태 (Presentation)
-
-| 현재 상태 | 이벤트 | 다음 상태 | 조건 | 실행 주체 |
-|---|---|---|---|---|
-| `draft` | 설정 검증 완료 | `ready` | 발표자 목록 1명 이상 | Teacher |
-| `ready` | 시작 | `live` | 없음 | Teacher |
-| `live` | 다음/이전 발표자 이동 | `live` | 순서 내 이동 | Teacher |
-| `live` | 종료 | `ended` | 없음 | Teacher |
-
-발표자별 집계 상태:
-- `completed`: 동의 + 발표 완료
-- `incomplete`: 동의 + 발표 미완료
-- `consent_skipped`: 미동의
-
-## 3. Station Presence 상태
-
-| 현재 상태 | 이벤트 | 다음 상태 | 조건 |
+### 전이
+| 현재 | 이벤트 | 다음 | 비고 |
 |---|---|---|---|
-| `joined` | heartbeat 수신 | `active` | heartbeat 정상 |
-| `active` | 동일 역할 충돌 감지 | `readonly` | 최근 heartbeat 기기 아님 |
-| `readonly` | 교사 재배정/재승인 | `active` | 역할 재확정 |
-| `active`/`readonly` | 연결 종료 | `left` | timeout 또는 수동 퇴장 |
+| 생성 | 세션 생성 | `Pending` | 기본값 |
+| `Pending` | 세션 시작 | `Live` | Teacher/Station에서 시작 가능 |
+| `Live` | 세션 종료 | `Ended` | Teacher/Station에서 종료 가능 |
+| `Pending` | 세션 종료 | `Ended` | setter가 범용이라 코드상 가능 |
 
-충돌 규칙:
-- 같은 역할로 다중 기기 입장 시 최신 heartbeat 기기 1대만 `active`.
+## 2) 토론 진행 상태 전이(런타임 메모리)
 
-## 4. Record Window 상태
+### 상태 필드
+- `phase`: `Opening` -> `Rebuttal` -> `Rerebuttal` -> `FinalSummary`
+- `currentSpeakerIndex`
+- `isSpeechRunning`
+- `finalSpeechCompleted`
 
-| 현재 상태 | 이벤트 | 다음 상태 | 조건 |
-|---|---|---|---|
-| `closed` | 라운드 종료 | `open` | 기본 60초 시작 |
-| `open` | 타이머 만료 | `locked` | 자동 잠금 |
-| `open` | 조기 잠금 | `locked` | Teacher 수동 |
-| `locked` | 교사 재오픈 | `open` | 최대 120초, 사유 기록 |
-| `open` | 세션 종료 | `locked` | 즉시 잠금 |
+### Ordered 모드
+| 조건 | 결과 |
+|---|---|
+| 같은 phase에서 다음 발언자 존재 | `currentSpeakerIndex + 1` |
+| 마지막 발언자이고 다음 phase 존재 | 다음 phase로 이동, 발언자 0으로 초기화 |
+| `FinalSummary` 마지막 발언자 종료 | `finalSpeechCompleted = true` |
 
-## 5. RecordEvent 상태
+### Free 모드
+- phase/speaker 진행 규칙을 강제하지 않음.
+- `canEndDebate()`는 발언자 수가 있으면 종료 가능 반환.
 
-| 현재 상태 | 이벤트 | 다음 상태 | 조건 |
-|---|---|---|---|
-| `created` | 3초 내 되돌리기 | `undone` | 작성 스테이션 동일 |
-| `created` | 교사 무효 처리 | `invalidated` | 사유 입력 |
-| `created` | 확정 | `effective` | 잠금 또는 승인 시 |
-| `invalidated` | 무효 해제 | `effective` | Teacher만 |
+## 3) Station 화면 상태 전이
 
-제약:
-- 라운드당 팀별 최대 6건.
-- `locked` 상태에서 team_station 신규 생성 불가.
+### 상태 집합
+- `landing`
+- `waiting`
+- `live`
 
-## 6. SpecialBundle 상태
+### 전이
+| 현재 | 이벤트 | 다음 |
+|---|---|---|
+| `landing` | 입장 버튼 | `waiting` |
+| `waiting` | 배치 완료 + 자동 타이머 | `live` |
+| `live` | 토론 종료 | `/station/report` 라우팅 |
 
-| 현재 상태 | 이벤트 | 다음 상태 | 조건 |
-|---|---|---|---|
-| `draft` | 자동 추천 생성 | `draft` | Primary 3~5건 |
-| `draft` | 교사 수정 저장 | `draft` | 이벤트 선택 변경 |
-| `draft` | 최종 확정 | `finalized` | Teacher 명시 확정 |
-| `finalized` | 재편집 | `draft` | Teacher 재오픈 |
+## 4) Report 화면 view 전이
 
-## 7. 권한 매트릭스 요약
-- Teacher:
-  - 세션 상태 전이 전부 가능.
-  - record window 재오픈/무효 처리/강제 시작 가능.
-- Desk Station:
-  - 읽기/모니터링만.
-- Team Station:
-  - `open` 구간에서 자기 팀 이벤트 생성/3초 되돌리기만 가능.
+### 상태 집합
+- `report`
+- `manage`
 
-## 8. 감사 로그 필수 이벤트
-- `session.force_started`
-- `session.paused`
-- `session.resumed`
-- `session.ended`
-- `record_window.reopened`
-- `record_event.invalidated`
-- `station.role_reassigned`
+### 규칙
+- `source=station`이면 `report` view를 강제.
+- 그 외에는 `view=report/manage` query로 전환.
+
+## 5) 저장/복구
+- 세션 데이터는 `localStorage(classflow.mock.sessions.v1)`에 저장.
+- 토론 진행 상태(`useSessionFlow`)는 메모리 상태라 새로고침 시 초기화.
