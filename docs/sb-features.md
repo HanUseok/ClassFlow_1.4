@@ -1,95 +1,175 @@
-﻿# SB 기능 정의서 (현재 구현 기준)
+# SB Features (Current Implementation)
 
-- 기준일: 2026-03-06
-- 범위: Teacher/Station 핵심 UX, 현재 코드에 존재하는 기능만 문서화
-- 데이터 입출력 상세: `docs/ux-io-spec.md`
+- Verified Date: 2026-03-06
+- Scope: current routed Teacher/Station product behavior only
 
-## A. 진입과 역할 분리
-- `/` 접속 시 `/teacher`로 리다이렉트
-- Teacher 영역: `/teacher/*`
-- Station 영역: `/station/*`
-- 인증/인가는 현재 미구현
+## A. Teacher Dashboard (`/teacher`)
+- Session engine card
+  - shows pending session continuation when a pending session exists
+  - shows `세션 종료하기` for the first pending session
+  - otherwise shows `새 세션 생성`
+- Deadline cards from `DEADLINES`
+- Semester preparation card
+  - evidence-holding students
+  - students without evidence
+  - students with featured evidence
+- Watch students card
+  - `근거 없음`
+  - `대표 사례 없음`
+- Recent class participation card
+  - based on the most recent Debate session events
+  - falls back to all debate events if the recent debate has no events
+- Recent evidence section
+  - recent evidence digest
+  - `오늘 바로 쓸 수 있는 근거 3개`
+  - evidence cards can show `⭐ 대표 사례 추천`
 
-## B. Teacher 공통 네비게이션
-- 상단 네비에 `메인`, `세션`, `학생`, `설정` 제공
-- 활성 메뉴는 `/teacher`는 정확 일치, 나머지는 `startsWith`로 판별
+## B. Session List (`/teacher/sessions`)
+- Filter by type/status
+- Search by title/topic text
+- Status-specific action labels
+  - pending: `확인/수정`
+  - live: `세션 진입`
+  - ended: `레포트 확인`
+- Ended Debate has an additional `수업 요약` action
+- Per-session delete and bulk delete
 
-## C. Teacher 대시보드 (`/teacher`)
-- Pending 세션이 있으면 우선 세션 안내와 빠른 진입 제공
-- Pending 세션 없으면 새 세션 생성(토론) 제공
-- Pending 세션이 있으면 `이어하기`와 `세션 종료하기` 액션 동시 제공
-- 마감 일정 카드(`DEADLINES`)를 D-day 기준 톤으로 표시
-- 세특 준비 상태(근거 보유/미보유/대표사례) 요약
-- 관찰 필요 학생(근거 없음, 대표 사례 없음) 노출
-- 최근 근거/즉시 활용 근거 노출 및 대표사례 지정
-- `오늘 바로 쓸 수 있는 근거 3개` 섹션 제공
-- 최근 근거에는 report kind badge, quality badge, 논거/사고 요약, 키워드 요약 표시
-- 즉시 활용 근거 카드에서 `대표사례 지정`과 `학생 상세` 이동 제공
+## C. Session Create/Edit (`/teacher/sessions/create`)
+- Shared create/edit entry for Debate and Presentation
+- Debate flow supports:
+  - Ordered / Free mode
+  - teacher-guided toggle
+  - student selection
+  - group count / slot settings
+  - argument card and recording-related setup
+- Presentation flow supports:
+  - presenter order
+  - seconds per presenter
+  - per-presenter recording flag
 
-## D. 세션 목록 (`/teacher/sessions`)
-- 타입/상태/검색 필터
-- 상태 기반 메인 액션
-- `Pending`: 수정/확인 페이지로 이동
-- `Live`: 세션 상세로 이동
-- `Ended`: 세션 리포트로 이동
-- 개별 삭제, 전체 삭제 지원
+## D. Debate Session Detail (`/teacher/sessions/[id]`)
+- Pending Debate
+  - waiting/setup state
+  - desk placement UI for teacher-guided flow
+  - `세션 설정으로 가기`
+  - `세션 시작`
+- Live Debate
+  - teacher-guided flow exposes `진행 화면 / 관리 화면`
+  - top-level session action only shows `세션 종료`
+- Progress view
+  - teacher-guided live debate only
+  - ordered/free runtime screen
+  - free debate speech-type selection is available
+  - runtime completion button is `조 토론 종료`
+- Manage view
+  - observation-focused participation panel
+  - group cards
+  - group cards do not list per-student speech counts
+  - group cards expose group-level runtime controls and adjustment entry
+- Ended Debate
+  - detail screen is not kept
+  - access redirects to Session Summary
 
-## E. 세션 생성/수정 (`/teacher/sessions/create`)
-- `type`과 `sessionId` 쿼리로 생성/수정 모드 진입
-- Debate
-- `setup -> headcount -> cards` 단계
-- 단, 토론 대상 전원이 녹음 대상이면 `cards` 단계는 생략 가능
-- 모드(Ordered/Free), guided 여부, 단계별 시간 설정
-- 조별 배치/슬롯 조정/랜덤 배정
-- 토론 녹음 대상 학생 선택(`recordingStudentIds`)
-- 논거 카드 검수(유효 카드 수 조건)
-- Presentation
-- 발표 순서, 발표 시간, 녹음 여부 설정
-- 저장 또는 즉시 세션 실행 지원
+## E. Presentation Session Detail (`/teacher/sessions/[id]`)
+- Pending Presentation
+  - first presenter preview
+  - presenter duration
+  - `발표 시작하기`
+- Live Presentation
+  - current presenter
+  - recording/non-recording badge
+  - timer
+  - `발표하기` / `발표 끝내기`
+  - `다음 발표자` or final `세션 종료`
+  - order movement buttons `<` and `>`
+- Ended Presentation
+  - temporary AI-loading state
+  - then `ProfileReportView`
+  - note: session list does not reopen this ended state directly; the ended-session action currently goes to `/teacher/sessions/{id}/report`
 
-## F. 세션 상세 (`/teacher/sessions/[id]`)
-- Debate/Presentation 타입별 실행 화면 분기
-- Debate: 발언 순서/단계/종료 관리
-- Debate Free mode: 발언 유형(`질문/반박/동의`) 선택 UI
-- Debate: 녹음 제외 학생이 포함된 조에서는 카드 기반 기록 UI 노출
-- Presentation: 발표 진행과 타이머 기반 전개
-- Presentation Ended: 발표자 프로필 목록 + 선택 발표자 상세 리포트
-- 세션 없음 또는 로딩 상태 안내
+## F. Session Summary (`/teacher/sessions/[id]/summary`)
+- Debate-only summary page
+- Entry points
+  - immediately after Teacher `세션 종료`
+  - automatic redirect on ended debate detail access
+- Content
+  - total speech count
+  - active students
+  - silent students
+  - major claims
+  - concept tags
+  - team summaries
+  - participation summary
+- CTA
+  - `세션 레포트 보기`
 
-## G. Teacher 리포트 (`/teacher/sessions/[id]/report`)
-- 교사용 토론 리포트 화면
-- 세션 메타 정보와 학생별 매핑 결과 표시
-- 학생 프로필 목록을 먼저 보여주고, 선택한 학생의 상세 레포트 표시
-- Ordered Debate: `입론/반론/재반론/마무리`별 상세
-- Free Debate: `매핑 1~4` 상세
-- 목록으로 돌아가기 제공
+## G. Teacher Report (`/teacher/sessions/[id]/report`)
+- Teacher debate report page
+- Top section: `Team Debate Summary`
+- Main body: `ProfileReportView`
+- Current implementation mixes generated/fallback content with session-derived context
 
-## H. 학생 (`/teacher/students`, `/teacher/students/[id]`)
-- 학생 목록: 검색 + 학급 필터
-- 학생 목록: `priorityScore` 기반 정렬
-- 학생 카드: `근거 없음`, `대표 사례 없음` badge 표시
-- 학생 상세: 프로필 헤더 + 근거 워크스페이스
-- 학생 상세: `대표 사례` 섹션, `세특 작성 모드`, `더보기/접기`
-- 학생 상세: 역량별 근거 묶음(`학업/진로/공동체/기타`)
-- 학생 상세: report kind 요약 badge (`발표/자유토론/순서토론`)
-- 학생 상세: 최근 레포트 반영 근거 섹션
-- 학생 상세: 전체 기록 보기 섹션에서 타입 필터(`all/Debate/Presentation`)
-- 학생 상세: 세션별 아코디언 확장/축소
-- 존재하지 않는 학생 ID는 `notFound()` 처리
+## H. Student List (`/teacher/students`)
+- Search by student name
+- Filter by class
+- Student cards are sorted by `priorityScore`
+- Cards can show:
+  - `근거 없음`
+  - `대표 사례 없음`
 
-## I. 설정 (`/teacher/settings`)
-- 명단 탭: 학급/학생 목록, CSV 업로드 버튼(UI)
-- 스테이션 탭: 역할 변경/삭제(UI)
+## I. Student Detail (`/teacher/students/[id]`)
+- Writing-first layout
+- Order
+  - preparation status
+  - writing mode
+  - featured evidence
+  - competency-grouped evidence
+  - recent reported evidence
+  - full record list
+- Preparation status uses:
+  - `ready`
+  - `needs_featured`
+  - `insufficient`
+- Writing mode includes
+  - generated student-record paragraph
+  - keyword badges
+  - similarity warning
+  - selected evidence
+  - template sentence examples
+- Evidence cards can show recommendation badges
 
-## J. Station (`/station`)
-- 상태: `landing -> identity -> group -> waiting -> live`
-- 활성 토론 세션 없으면 안내 메시지 표시
-- live에서 Quick Add와 발언 제어 수행
-- 토론 녹음 대상 제한 시, 비대상 참여자에게 기록 제한 UI 적용
-- 종료 시 `/station/report?...&source=station`으로 이동
+## J. Settings (`/teacher/settings`)
+- Two tabs
+  - roster
+  - stations
+- Roster tab
+  - class list
+  - student rows by class
+  - CSV upload button UI
+- Stations tab
+  - station list
+  - role selector
+  - delete action
 
-## K. Station 리포트 (`/station/report`)
-- query 기반 리포트 렌더링
-- `view=report|manage` 지원
-- `source=station`이면 report view 강제
-- query 파싱 실패 시 fallback 데이터 사용
+## K. Station (`/station`)
+- Entry states
+  - landing
+  - identity
+  - group
+  - waiting
+  - live
+- Waiting state includes self-placement desk UI
+- Live debate supports:
+  - ordered debate flow
+  - free debate flow
+  - free debate speech-type selection
+  - recording/non-recording constraints for participants
+
+## L. Station Report (`/station/report`)
+- Query-driven report page
+- Two modes
+  - `view=report`
+  - `view=manage`
+- `source=station` forces report mode and removes teacher-style top navigation
+- Ordered and Free debate render different report tables
+- Manage mode uses `ReportManageView`

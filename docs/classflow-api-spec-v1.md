@@ -1,18 +1,51 @@
-﻿# ClassFlow API Spec v1 (현행 구현 기준)
+# ClassFlow API Spec v1 (Current Implementation)
 
-## 상태
+## Status
 - Verified Date: 2026-03-06
-- 현재 프로젝트는 Next.js 클라이언트 앱이며 백엔드 API가 구현되어 있지 않음
-- 이 문서는 현재 내부 서비스 계약과 향후 HTTP API 전환 기준을 함께 정의함
+- There is no backend HTTP API in the current codebase.
+- Current data access is handled through application-layer functions, repositories, localStorage, and seeded mock data.
 
-## 1) 현재 구현된 내부 서비스 계약 (Application Layer)
+## 1. Current Implementation State
 
-### Session Service (`lib/application/session-service.ts`)
+### No HTTP API
+- No `fetch`/REST backend contract exists for sessions, students, reports, or stations.
+- Current pages call local application services or read seeded data directly.
+
+### Data Delivery Today
+- Sessions:
+  - application service: `lib/application/session-service.ts`
+  - repository port: `lib/application/ports/session-repository.ts`
+  - concrete persistence: localStorage-backed repository via `lib/infrastructure/session-repository.ts`
+- Roster:
+  - application service: `lib/application/roster-service.ts`
+  - concrete repository: `lib/infrastructure/roster-repository.ts`
+  - source data: seeded `mock-data`
+- Featured evidence:
+  - separate local store in `lib/featured-evidence-store.ts`
+- Station report:
+  - report payload is serialized into `/station/report` query params
+  - this is a UI transport mechanism, not a stable HTTP API contract
+
+### Current Product Notes
+- `/teacher/sessions/{id}/report` is effectively debate-report oriented.
+- Station report uses query-string transport for logs, names, session metadata, and view mode.
+- Featured evidence persistence is separate from session persistence.
+
+## 2. Current Internal Service Contracts
+
+### Session Service
+Current public functions in `lib/application/session-service.ts`:
+
+- `configureSessionRepository(nextRepository)`
 - `listSessions()`
 - `getSession(sessionId)`
 - `createSession(input)`
+- `createDebateSession(input)`
+- `createPresentationSession(input)`
 - `startSession(sessionId)`
 - `endSession(sessionId)`
+- `startDebateSession(sessionId)`
+- `finishDebateSession(sessionId, reportInput?)`
 - `setSessionStatus(sessionId, status)`
 - `updateSessionBasics(sessionId, input)`
 - `overwriteSessionFromInput(sessionId, input)`
@@ -21,63 +54,94 @@
 - `deleteSession(sessionId)`
 - `deleteAllSessions()`
 - `subscribeSessionChanges(listener)`
+- `saveSpeech(history, log, limit)`
+- `buildSessionReportPath(input)`
+- `startParticipantSpeech(params)`
+- `finishParticipantSpeech(params)`
 - `completeStationDebate(params)`
 
-### Roster Service (`lib/application/roster-service.ts`)
+### Roster Service
+Current public functions in `lib/application/roster-service.ts`:
+
 - `listClasses()`
 - `listStudents()`
 - `listStations()`
 - `listDebateEvents()`
 
-## 2) 현재 데이터 전달 방식
-- Session/Student/Station 데이터: `mock-data` + `localStorage`
-- 리포트: `/station/report` query string 직렬화 방식
+### Session Repository Port
+Current persistence contract in `lib/application/ports/session-repository.ts`:
 
-## 3) 향후 HTTP API 전환 시 최소 엔드포인트 제안
+- `list()`
+- `getById(sessionId)`
+- `create(input)`
+- `updateStatus(sessionId, status)`
+- `updateTeams(sessionId, teams)`
+- `updateDebateGroups(sessionId, groups)`
+- `update(sessionId, input)`
+- `replaceFromInput(sessionId, input)`
+- `remove(sessionId)`
+- `removeAll()`
+- `subscribe(listener)`
+
+### Derived Data Utilities
+- `lib/application/teacher-insights.ts` is not a transport API.
+- It provides derived calculations for:
+  - participation stats
+  - recommendation scoring
+  - session/team summary
+  - preparation status
+  - record draft generation
+  - record similarity
+
+## 3. Current UI Transport Contracts
+
+### Station Report Query Contract
+`/station/report` currently receives serialized UI payload through query parameters:
+
+- `round`
+- `phase`
+- `logs`
+- `names`
+- `sessionId`
+- `teacherGuided`
+- `sessionTitle`
+- `sessionStatus`
+- `groupCount`
+- `groupLayout`
+- `view`
+- `source`
+
+Notes:
+- `logs` and `groupLayout` are JSON-serialized string payloads.
+- `source=station` forces report mode and changes top-level navigation behavior.
+- This should be treated as current UI plumbing, not a future-safe API shape.
+
+## 4. Unimplemented HTTP API Proposals
+
+The following are proposals only. They are not implemented in the current codebase.
+
+### Minimal Session/Student Endpoints
 - `GET /api/v1/sessions`
 - `POST /api/v1/sessions`
+- `GET /api/v1/sessions/{id}`
 - `PATCH /api/v1/sessions/{id}`
 - `POST /api/v1/sessions/{id}/status`
 - `GET /api/v1/students`
 - `GET /api/v1/students/{id}`
+
+### Report Endpoints
 - `GET /api/v1/sessions/{id}/report`
+- optional: `GET /api/v1/sessions/{id}/summary`
+- optional: `GET /api/v1/station-reports/{id}`
 
-## 4) 발표 리포트 계약 추정
+### Presentation Report Proposal
+- If Presentation report becomes a server contract later, it is safer to expose it as either:
+  - a computed response under the session resource, or
+  - a separate report resource
+- Example candidate:
+  - `GET /api/v1/sessions/{id}/presentation-report`
 
-### 목적
-- Presentation 세션 종료 후, 발표자별 키워드 테이블을 API 응답이나 내부 service 결과로 직렬화할 때의 기준 모델
-
-### Suggested Response Shape
-```json
-{
-  "sessionId": "sess-123",
-  "sessionType": "Presentation",
-  "rows": [
-    {
-      "presenterOrder": 1,
-      "studentId": "s1",
-      "studentName": "김민준",
-      "recording": true,
-      "topicKeywords": ["지역경제", "디지털 전환", "공공성"],
-      "problemKeywords": [],
-      "researchMethodKeywords": ["설문 조사"],
-      "analysisKeywords": ["적용 범위 확장", "원인-결과", "대안 제시"],
-      "majorConnectionKeywords": ["교육학", "디자인"],
-      "competencyKeywords": ["질문 설계"],
-      "growthKeywords": []
-    }
-  ]
-}
-```
-
-### Suggested Endpoint
-- `GET /api/v1/sessions/{id}/presentation-report`
-
-### Notes
-- 현재 코드에는 실제 HTTP API가 없음
-- 위 응답의 키워드 배열은 현재 구현 기준으로는 규칙 기반 계산 결과에 가까움
-- 서버 전환 시 `presentation.presenters[]`는 저장 데이터, `rows[]`는 계산 결과 또는 별도 저장 테이블로 분리하는 편이 안전함
-
-## 5) 비고
-- 위 HTTP 엔드포인트는 제안 단계이며 현재 코드에는 미구현
-- 실제 도입 시 현재 service 함수 시그니처를 우선 호환 대상으로 삼는 것을 권장
+## 5. API Notes
+- This project currently has internal service contracts, not public HTTP API contracts.
+- Any future HTTP API should be mapped from the current service-layer behavior first.
+- Station report query serialization should not be treated as a stable long-term API.

@@ -1,83 +1,47 @@
-﻿# ClassFlow 상태 전이 정의 (코드 기준 v3)
+# ClassFlow State Transitions (Current Implementation)
 
-## 기준
-- Verified Date: 2026-03-06
-- 실제 구현 파일:
-- `lib/mock-data.ts`
-- `hooks/use-session-flow.ts`
-- `hooks/station/use-station-entry-flow.ts`
-- `lib/domain/session/index.ts`
-- `app/station/page.tsx`
-- `components/session/session-detail-page-content.tsx`
-
-## 1) Session 상태 전이
-
-### 상태 집합
-- `Pending`
-- `Live`
-- `Ended`
-
-### 전이
-| 현재 | 이벤트 | 다음 | 비고 |
+## 1. Session Status Transitions
+| Current | Event | Next | Notes |
 |---|---|---|---|
-| 생성 | 세션 생성 | `Pending` | 기본값 |
-| `Pending` | 세션 시작 | `Live` | Teacher/Station 가능 |
-| `Live` | 세션 종료 | `Ended` | Teacher/Station 가능 |
-| `Pending` | 세션 종료 | `Ended` | setter가 범용이라 코드상 가능 |
+| created | create session | `Pending` | default |
+| `Pending` | start session | `Live` | Teacher or Station path |
+| `Live` | end session | `Ended` | session-level end |
+| `Pending` | end session | `Ended` | possible from dashboard action |
 
-## 2) Debate 런타임 상태 전이
-
-### 상태 필드
-- `phase`
-- `currentSpeakerIndex`
-- `isSpeechRunning`
-- `finalSpeechCompleted`
-
-### Ordered 모드
-| 조건 | 결과 |
-|---|---|
-| 같은 phase에서 다음 발언자 존재 | `currentSpeakerIndex + 1` |
-| 마지막 발언자이고 다음 phase 존재 | 다음 phase로 이동, speaker=0 |
-| `FinalSummary` 마지막 발언자 종료 | `finalSpeechCompleted = true` |
-
-### Free 모드
-- phase/speaker 완주 조건 강제 없음
-- `canEndDebate()`는 speaker 수가 있으면 종료 가능 반환
-
-## 3) Station Entry 상태 전이
-
-### 상태 집합
-- `landing`
-- `identity`
-- `group`
-- `waiting`
-- `live`
-
-### 전이
-| 현재 | 이벤트 | 다음 |
+## 2. Teacher Debate Screen Transitions
+| Current | Event | Next |
 |---|---|---|
-| `landing` | 입장 버튼 | `identity` |
-| `identity` | 학생 선택 후 다음 | `group` |
-| `group` | 조 선택 | `waiting` |
-| `waiting` | 배치 완료 | `live` |
-| `live` | 종료/완료 | `/station/report` 라우팅 |
+| `/teacher/sessions/{id}` | `세션 종료` | `/teacher/sessions/{id}/summary` |
+| `/teacher/sessions/{id}` | ended debate detail access | `/teacher/sessions/{id}/summary` via `replace` |
+| `/teacher/sessions/{id}/summary` | `세션 레포트 보기` | `/teacher/sessions/{id}/report` |
 
-## 4) Report view 전이
+## 3. Presentation Detail Transitions
+| Current | Event | Next |
+|---|---|---|
+| pending presentation detail | `발표 시작하기` | live presentation detail |
+| live presentation detail | `다음 발표자` | same page |
+| live presentation detail | final presenter complete | ended presentation detail |
+| ended presentation detail | AI loading complete | profile report view on same page |
+| session list ended presentation action | `레포트 확인` | `/teacher/sessions/{id}/report` |
 
-### 상태 집합
-- `report`
-- `manage`
+## 4. Group End vs Session End
+| Action | Result |
+|---|---|
+| `조 토론 종료` | ends group-level runtime only |
+| `세션 종료` | sets session to `Ended` and routes to summary |
 
-### 규칙
-- `source=station`이면 `report` 강제
-- 그 외에는 query `view=report/manage`로 전환
+## 5. Station Flow Transitions
+| Current | Event | Next |
+|---|---|---|
+| `landing` | join | `identity` |
+| `identity` | select student | `group` |
+| `group` | select group | `waiting` |
+| `waiting` | placement complete | `live` |
+| `live` | debate completion | `/station/report?...&source=station` |
 
-## 5) 저장/복구
-- 세션 데이터: localStorage 저장
-- 토론 런타임 상태: 메모리 상태, 새로고침 시 초기화
-- 토론 녹음 대상 목록: 세션의 `debate.assignmentConfig.recordingStudentIds`에 저장
-
-## 6) Debate Recording Rule
-- 녹음 대상 목록이 비어 있으면 모든 참여자 기록 가능
-- 녹음 대상 목록이 있으면 목록에 포함된 참여자만 기록 가능
-- 비대상 참여자는 Station live에서 기록 제한 UI를 보게 됨
+## 6. Station Report View Transitions
+| Current | Event | Next |
+|---|---|---|
+| `/station/report?...&view=report` | switch view | `/station/report?...&view=manage` |
+| `/station/report?...&view=manage` | switch view | `/station/report?...&view=report` |
+| `/station/report?...&source=station` | open | report view forced |

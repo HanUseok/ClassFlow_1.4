@@ -1,68 +1,133 @@
-﻿# 화면 정의서 (페이지 단위)
+# Screen Definitions (Current Implementation)
 
-- 기준일: 2026-03-06
-- 기준: `app/**/page.tsx` 실제 구현
-
-## `/`
-- 목적: 루트 진입 처리
-- 동작: 즉시 `/teacher`로 리다이렉트
+- Verified Date: 2026-03-06
+- Basis: routed screens only
 
 ## `/teacher`
-- 목적: 교사 대시보드
-- 핵심 UI: 세션 엔진 카드, 마감 카드, 준비 상태 카드, 관찰 필요 학생, 최근 근거, 오늘 바로 쓸 수 있는 근거 3개
-- 주요 액션: 대기 세션 진입/종료, 새 세션 생성, 대표사례 지정, 학생 상세 이동
+- Purpose: Teacher dashboard
+- Section order
+  - session engine
+  - deadline cards
+  - semester preparation status
+  - watch students
+  - recent class participation
+  - recent evidence
+- Primary actions
+  - continue pending session
+  - end pending session
+  - create debate session
+  - go to session list
+  - open student detail
 
 ## `/teacher/sessions`
-- 목적: 세션 목록 관리
-- 핵심 UI: 필터(타입/상태/검색), 세션 카드 목록
-- 주요 액션: 상태별 진입, 세션 삭제, 전체 삭제, 새 토론/발표 세션 생성
+- Purpose: session inventory
+- UI
+  - type filter
+  - status filter
+  - search field
+  - session cards
+  - create buttons
+- Status-specific actions
+  - pending -> create/edit route
+  - live -> detail route
+  - ended -> report route
+  - ended debate -> summary route
+  - ended presentation still uses the generic ended-session report route
 
 ## `/teacher/sessions/create`
-- 목적: 세션 생성/수정
-- 핵심 UI: 주제 입력, Debate 단계 UI, 발표 설정 UI
-- Debate 핵심 필드: 조 배치, 논거 카드, 녹음 대상 학생
-- 주요 액션: 저장, 세션 실행
+- Purpose: shared create/edit flow
+- Main UI
+  - debate path and presentation path
+  - existing session edit mode via `sessionId`
+  - creation/update completion back to session list
 
 ## `/teacher/sessions/[id]`
-- 목적: 세션 실행/운영
-- 핵심 UI: 타입별 실행 화면(토론/발표)
-- 토론 화면: 녹음 대상 설정에 따라 카드 기록 UI가 조별로 달라질 수 있음
-- 자유토론 화면: 발언 유형(`질문/반박/동의`) 선택 UI
-- 발표 종료 화면: 발표자 프로필 목록 + 선택 발표자 상세 리포트
-- 주요 액션: 진행 제어, 종료, 보고서 이동
+- Purpose: session detail and runtime
+- Debate states
+  - Pending: setup/placement/start UI
+  - Live: progress view or manage view
+  - Ended: redirect to summary
+- Presentation states
+  - Pending: first presenter preview and start
+  - Live: timer and presenter controls
+  - Ended: AI-loading screen then presentation report view
+  - note: this ended presentation view is visible on the detail route itself, but the session list's ended action currently points to `/report`
+
+## `/teacher/sessions/[id]/summary`
+- Purpose: debate summary page after session end
+- Main UI
+  - lesson summary KPIs
+  - major claims
+  - concept tags
+  - team summaries
+  - participation summary
+  - `세션 레포트 보기`
 
 ## `/teacher/sessions/[id]/report`
-- 목적: 교사용 세션 리포트 확인
-- 핵심 UI: 세션 메타, 학생 프로필 목록, 선택 학생 상세 리포트
-- Ordered Debate 상세: 입론/반론/재반론/마무리
-- Free Debate 상세: 매핑 1~4
-- 주요 액션: 학생 선택, 세션 목록으로 복귀
+- Purpose: teacher debate report
+- Main UI
+  - teacher report header
+  - `Team Debate Summary`
+  - student profile report list
 
 ## `/teacher/students`
-- 목적: 학생 탐색
-- 핵심 UI: 검색, 학급 필터, 우선순위 정렬된 학생 카드 그리드
-- 학생 카드 정보: 이름, 학급, `근거 없음` / `대표 사례 없음` badge
-- 주요 액션: 학생 상세로 이동
+- Purpose: student list
+- Main UI
+  - search
+  - class filter
+  - student cards
+- Card state indicators
+  - no evidence
+  - no featured evidence
 
 ## `/teacher/students/[id]`
-- 목적: 학생별 워크스페이스
-- 핵심 UI: 학생 프로필, 대표 사례, 세특 작성 모드, 역량별 근거 묶음, 최근 레포트 반영 근거, 전체 기록 보기
-- 세특 작성 모드: 대표 사례 기반 참고 문장 예시, 제출 마감 badge
-- 전체 기록 보기: 타입 필터(`all/Debate/Presentation`) + 세션 아코디언
-- 주요 액션: 대표 사례 지정/해제, 기록 확인, 세션 단위 확장/축소
+- Purpose: student evidence workspace
+- Screen order
+  - preparation status
+  - writing mode
+  - featured evidence
+  - competency-grouped evidence
+  - recent reported evidence
+  - full record list
+- Writing mode content
+  - generated paragraph
+  - keywords
+  - similarity warning
+  - selected evidence
+  - template sentences
 
 ## `/teacher/settings`
-- 목적: 명단/스테이션 설정 UI
-- 핵심 UI: 탭(명단/스테이션), 편집 UI
-- 주요 액션: 역할 변경, 삭제, CSV 업로드 버튼(UI)
+- Purpose: roster/station settings UI
+- Tabs
+  - roster
+  - stations
+- Roster tab
+  - classes and students
+  - CSV upload button UI
+- Stations tab
+  - station cards
+  - role selector
+  - delete button
 
 ## `/station`
-- 목적: 스테이션 참여 및 토론 진행
-- 핵심 UI: 대기/입장/조선택/배치/live 화면
-- live 화면: 참여자가 녹음 대상이 아니면 기록 제한 UI 노출
-- 주요 액션: 참여자 입장, 발언 시작/종료, 토론 종료
+- Purpose: station-side debate participation
+- State screens
+  - landing
+  - identity
+  - group
+  - waiting
+  - live
+- Live behavior
+  - free debate speech-type selector
+  - ordered debate or quick-add flow depending on mode/role
 
 ## `/station/report`
-- 목적: 토론 리포트 조회/관리 뷰
-- 핵심 UI: report/manage 전환, 로그 요약, 복귀 버튼
-- 주요 액션: 뷰 전환, Teacher 또는 Station 화면으로 복귀
+- Purpose: station report/manage page
+- Report mode
+  - ordered debate table or free debate table
+  - optional station return button
+- Manage mode
+  - manage-specific runtime controls via `ReportManageView`
+- Header behavior
+  - shown when not opened from `source=station`
+  - hidden when opened from `source=station`

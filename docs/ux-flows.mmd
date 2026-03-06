@@ -1,45 +1,46 @@
-﻿flowchart LR
-  A["/ 진입"] --> B["/teacher 리다이렉트"]
+flowchart LR
+  A["/ entry"] --> B["/teacher redirect"]
 
   subgraph Teacher["Teacher"]
-    T1["대시보드 /teacher"]
-    T2["세션 목록 /teacher/sessions"]
-    T3["세션 생성/수정 /teacher/sessions/create"]
-    T4["세션 상세 /teacher/sessions/[id]"]
-    T5["세션 리포트 /teacher/sessions/[id]/report"]
-    T6["학생 목록 /teacher/students"]
-    T7["학생 상세 /teacher/students/[id]"]
-    T8["설정 /teacher/settings"]
+    T1["/teacher dashboard"]
+    T2["/teacher/sessions list"]
+    T3["/teacher/sessions/create create-edit"]
+    T4["/teacher/sessions/[id] detail"]
+    T5["/teacher/sessions/[id]/summary debate summary"]
+    T6["/teacher/sessions/[id]/report teacher report"]
+    T7["/teacher/students list"]
+    T8["/teacher/students/[id] detail"]
+    T9["/teacher/settings"]
   end
 
   subgraph Station["Station"]
-    S1["입장 landing"]
-    S2["이름 선택 identity"]
-    S3["조 선택 group"]
-    S4["대기 waiting"]
-    S5["라이브 live"]
-    S6["리포트 /station/report"]
+    S1["landing"]
+    S2["identity"]
+    S3["group"]
+    S4["waiting"]
+    S5["live"]
+    S6["/station/report"]
   end
 
   B --> T1
   T1 --> T2
   T1 --> T3
-  T1 --> T6
-  T1 --> T8
+  T1 --> T7
+  T1 --> T9
 
   T2 --> T3
   T2 --> T4
   T2 --> T5
+  T2 --> T6
 
-  T3 --> T4
   T3 --> T2
+  T3 --> T4
 
-  T4 --> T5
-  T4 --> T2
+  T4 -->|"Debate session end"| T5
+  T5 --> T6
+  T6 --> T2
 
-  T6 --> T7
+  T7 --> T8
 
   S1 --> S2 --> S3 --> S4 --> S5 --> S6
   S6 --> S1
-
-  T4 -->|"토론 종료"| S6

@@ -1,29 +1,33 @@
-﻿# Routes Inventory (App Router)
+# Routes Inventory (Current Implementation)
 
 ## Scan Basis
-- Scope: `app/**/page.tsx`, `app/**/layout.tsx`
+- Scope: `app/**/page.tsx`
 - Verified Date: 2026-03-06
+- Rule: only routed screens are documented
 
 ## Route Table
-| Route Path | Page File | Layout Chain | Main Purpose | Params / Query |
-|---|---|---|---|---|
-| `/` | `app/page.tsx` | `app/layout.tsx` | 진입 시 `/teacher`로 리다이렉트 | 없음 |
-| `/teacher` | `app/teacher/page.tsx` | `app/layout.tsx` -> `app/teacher/layout.tsx` | 대시보드(세션/근거 준비 상태) | 없음 |
-| `/teacher/sessions` | `app/teacher/sessions/page.tsx` | `app/layout.tsx` -> `app/teacher/layout.tsx` | 세션 목록/필터/상태별 진입 | 없음 |
-| `/teacher/sessions/create` | `app/teacher/sessions/create/page.tsx` | `app/layout.tsx` -> `app/teacher/layout.tsx` | 세션 생성/수정 | `type`, `sessionId` |
-| `/teacher/sessions/[id]` | `app/teacher/sessions/[id]/page.tsx` | `app/layout.tsx` -> `app/teacher/layout.tsx` | 세션 상세/진행 | Path: `id` |
-| `/teacher/sessions/[id]/report` | `app/teacher/sessions/[id]/report/page.tsx` | `app/layout.tsx` -> `app/teacher/layout.tsx` | 교사용 세션 리포트 | Path: `id` |
-| `/teacher/students` | `app/teacher/students/page.tsx` | `app/layout.tsx` -> `app/teacher/layout.tsx` | 학생 목록/검색/학급 필터 | 없음 |
-| `/teacher/students/[id]` | `app/teacher/students/[id]/page.tsx` | `app/layout.tsx` -> `app/teacher/layout.tsx` | 학생 상세 워크스페이스 | Path: `id` |
-| `/teacher/settings` | `app/teacher/settings/page.tsx` | `app/layout.tsx` -> `app/teacher/layout.tsx` | 명단/스테이션 설정 UI | 없음 |
-| `/station` | `app/station/page.tsx` | `app/layout.tsx` -> `app/station/layout.tsx` | 스테이션 입장/배치/라이브 토론 | 없음 |
-| `/station/report` | `app/station/report/page.tsx` | `app/layout.tsx` -> `app/station/layout.tsx` | 토론 리포트(report/manage) | `round`, `phase`, `logs`, `names`, `sessionId`, `teacherGuided`, `sessionTitle`, `sessionStatus`, `groupCount`, `groupLayout`, `view`, `source` |
+| Route Path | Page File | Main Purpose | Params / Query |
+|---|---|---|---|
+| `/` | `app/page.tsx` | Redirect entry to Teacher | none |
+| `/teacher` | `app/teacher/page.tsx` | Teacher dashboard | none |
+| `/teacher/sessions` | `app/teacher/sessions/page.tsx` | Session list, filters, status-specific actions | none |
+| `/teacher/sessions/create` | `app/teacher/sessions/create/page.tsx` | Session create/edit flow | `type`, `sessionId` |
+| `/teacher/sessions/[id]` | `app/teacher/sessions/[id]/page.tsx` | Session detail and runtime screen | Path: `id` |
+| `/teacher/sessions/[id]/summary` | `app/teacher/sessions/[id]/summary/page.tsx` | Debate session summary after session end | Path: `id` |
+| `/teacher/sessions/[id]/report` | `app/teacher/sessions/[id]/report/page.tsx` | Teacher debate report | Path: `id` |
+| `/teacher/students` | `app/teacher/students/page.tsx` | Student list with search/filter | none |
+| `/teacher/students/[id]` | `app/teacher/students/[id]/page.tsx` | Student evidence and writing workspace | Path: `id` |
+| `/teacher/settings` | `app/teacher/settings/page.tsx` | Teacher settings UI for roster/stations | none |
+| `/station` | `app/station/page.tsx` | Station entry, placement, waiting, live debate | none |
+| `/station/report` | `app/station/report/page.tsx` | Station report or manage view | `round`, `phase`, `logs`, `names`, `sessionId`, `teacherGuided`, `sessionTitle`, `sessionStatus`, `groupCount`, `groupLayout`, `view`, `source` |
 
-## Layout Mapping
-- Root layout: `app/layout.tsx`
-- Teacher layout: `app/teacher/layout.tsx` (`TeacherNav` + main container)
-- Station layout: `app/station/layout.tsx` (중앙 정렬 컨테이너)
-
-## Notes
-- 인증/인가 로직은 현재 구현되어 있지 않음.
-- Teacher/Station 분기는 URL 네임스페이스로 처리.
+## Route Notes
+- `/teacher/sessions/[id]` handles both Debate and Presentation sessions.
+- `Ended Debate` does not stay on the detail screen. Accessing detail redirects to `/teacher/sessions/{id}/summary`.
+- `Ended Presentation` stays inside the presentation flow and shows a report-style result in the detail page.
+- Session list uses `/teacher/sessions/{id}/report` for all ended sessions. For Presentation sessions, that route is not a full presentation report page and currently falls back to the debate-report screen's "not found" style state.
+- `/teacher/sessions/[id]/summary` is meaningful only for Debate sessions.
+- `/station/report` has two modes:
+  - `view=report`
+  - `view=manage`
+- `/station/report?source=station` forces report mode and hides the teacher-style top header.

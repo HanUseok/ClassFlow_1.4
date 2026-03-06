@@ -1,100 +1,141 @@
-﻿# ClassFlow DB Schema v1 (현행 구현 기준)
+# ClassFlow Storage / DB Schema v1 (Current Implementation)
 
-## 상태
+## Status
 - Verified Date: 2026-03-06
-- 현재 프로젝트는 DB를 사용하지 않고 `localStorage`를 사용
-- 이 문서는 현행 저장 구조와 향후 DB 전환 시 기준 모델을 함께 정리함
+- The current project does not use a database.
+- The current persistence model is a mix of:
+  - seeded mock data
+  - localStorage overlays
+  - in-memory runtime state
 
-## 1) 현행 저장소
-- 키: `classflow.mock.sessions.v1`
-- 저장 단위: `Session[]` JSON
-- 저장 위치: 브라우저 `localStorage`
+## 1. Current Persistent Storage
 
-## 2) 현행 핵심 데이터 모델
+### localStorage Keys
+- `classflow.mock.sessions.v1`
+  - stores mutable `Session[]`
+- `classflow.representative.v1`
+  - stores featured-evidence selections as `Record<studentId, eventId[]>`
+
+### Seeded Read-Only Data
+Seed data is currently served from `mock-data` and related repository wrappers:
+
+- classes
+- students
+- stations
+- debate events
+- seed sessions used as initial session baseline
+
+### Current Persistence Shape
+- Sessions are mutable through localStorage.
+- Featured evidence is mutable through a separate localStorage store.
+- Roster data and debate events are currently seeded/mock source data, not mutable DB-backed rows.
+
+## 2. Current Data Model
 
 ### Session
 - `id`
 - `type`: `Debate | Presentation`
 - `status`: `Pending | Live | Ended`
-- `classId`, `className`
-- `title`, `topic`, `date`
+- `classId`
+- `className`
+- `title`
+- `topic`
+- `date`
 - `teams` (optional)
 - `debate` (optional)
 - `presentation` (optional)
 
-### Debate Config
+### Debate
 - `mode`: `Ordered | Free`
 - `teacherGuided`
 - `orderedFlow.stages[]`
+- `membersPerGroup`
+- `moderators[]`
 - `groups[]`
-- `assignmentConfig`:
-- `groupCount`, `affirmativeSlots`, `negativeSlots`, `moderatorSlots`
-- `selectedStudentIds`, `recordingStudentIds`
-- `groupAssignments`, `groupSlotAdjust`
+- `assignmentConfig`
+  - `groupCount`
+  - `affirmativeSlots`
+  - `negativeSlots`
+  - `moderatorSlots`
+  - `selectedStudentIds`
+  - `recordingStudentIds`
+  - `groupAssignments`
+  - `groupSlotAdjust`
 
-### Presentation Config
+### Presentation
 - `presenters[]`
 - `secondsPerPresenter`
 
-### Presentation Report Row (추정 모델)
-- `presenterOrder`
-- `studentId`
-- `studentName`
-- `recording`
-- `topicKeywords[]`
-- `problemKeywords[]`
-- `researchMethodKeywords[]`
-- `analysisKeywords[]`
-- `majorConnectionKeywords[]`
-- `competencyKeywords[]`
-- `growthKeywords[]`
+### Featured Evidence Map
+- keyed by `studentId`
+- value is `eventId[]`
 
-## 3) 비영속 런타임 상태
-- `useSessionFlow` 내부 상태 (`phase`, `currentSpeakerIndex`, `isSpeechRunning`, `finalSpeechCompleted`)
-- 스테이션 입장 상태 (`landing/identity/group/waiting/live`)
+### Seed Debate Events
+- current event source for dashboard/student/report-derived logic
+- not currently stored as mutable rows in localStorage
 
-## 4) 향후 RDB 전환 최소 테이블 제안
+## 3. Non-Persistent Runtime State
+
+### Debate Runtime
+In-memory runtime state includes values such as:
+
+- `phase`
+- `currentSpeakerIndex`
+- `isSpeechRunning`
+- `finalSpeechCompleted`
+- teacher view mode
+- group-ended UI state
+
+### Station Runtime
+- entry flow state:
+  - `landing`
+  - `identity`
+  - `group`
+  - `waiting`
+  - `live`
+- participant speech state
+- temporary placement state
+
+### Presentation Runtime
+- `currentIndex`
+- `timeLeft`
+- `isRunning`
+- `readyForNext`
+- `showAiLoading`
+
+## 4. Current Model Notes
+- Debate events are currently a seed/mock source, not a mutable event table.
+- Teacher report is not backed by a fully persisted report entity.
+- Presentation report rows are derived/generated in UI logic, not stored persistently.
+- Featured evidence is persisted separately from sessions, not embedded in the session store.
+
+## 5. Future DB Proposals
+
+The following are future proposals only. They are not implemented today.
+
+### Minimum Practical Tables
 - `sessions`
+- `classes`
+- `students`
+- `debate_events`
+- `featured_evidence`
+
+### Optional Future Tables
 - `session_debate_config`
 - `session_debate_groups`
 - `session_presentation_config`
-- `session_presentation_report_rows`
-- `students`
-- `classes`
-- `debate_events`
+- `session_reports`
+- `session_report_rows`
 
-### Suggested Table: `session_presentation_report_rows`
-- `id`
-- `session_id`
-- `student_id`
-- `presenter_order`
-- `recording_enabled`
-- `topic_keywords_json`
-- `problem_keywords_json`
-- `research_method_keywords_json`
-- `analysis_keywords_json`
-- `major_connection_keywords_json`
-- `competency_keywords_json`
-- `growth_keywords_json`
+### Presentation Report Storage
+- Presentation report rows should be treated as optional future persistence.
+- Safer rollout path:
+  - start as computed response
+  - promote to stored rows only if editing/export/history requires it
 
-### Example Row
-```json
-{
-  "session_id": "sess-123",
-  "student_id": "s1",
-  "presenter_order": 1,
-  "recording_enabled": true,
-  "topic_keywords_json": ["지역경제", "디지털 전환", "공공성"],
-  "problem_keywords_json": [],
-  "research_method_keywords_json": ["설문 조사"],
-  "analysis_keywords_json": ["적용 범위 확장", "원인-결과", "대안 제시"],
-  "major_connection_keywords_json": ["교육학", "디자인"],
-  "competency_keywords_json": ["질문 설계"],
-  "growth_keywords_json": []
-}
-```
-
-## 5) 비고
-- 본 문서의 RDB 스키마 항목은 제안이며 현재 코드에는 미구현
-- 서버 전환 시 우선순위는 `sessions` + `debate_events` 권장
-- 발표 리포트는 저장 없이 계산 응답으로 시작하고, 필요 시 `session_presentation_report_rows`로 승격하는 방식이 현실적
+## 6. Storage Notes
+- This document describes the current storage model more accurately than a true DB schema.
+- Any future DB should separate:
+  - immutable seed/demo data
+  - mutable runtime/session data
+  - derived report/insight data

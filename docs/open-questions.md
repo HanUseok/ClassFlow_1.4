@@ -1,28 +1,69 @@
-﻿# Open Questions (확인 필요)
+# Open Questions (Current Unresolved Decisions)
 
-- 기준일: 2026-03-06
-- 목적: 코드에서 결정되지 않았거나 향후 정책 결정이 필요한 항목 정리
+- Verified Date: 2026-03-06
+- Purpose: decisions that are still unresolved in the current codebase
 
-## 1) 인증/권한 정책
-- 현황: Teacher/Station은 URL 네임스페이스로만 분리
-- 질문: 실제 운영에서 역할 인증을 언제/어떻게 도입할지
+## 1. Auth / Role Gating
+- Current state:
+  - Teacher and Station are separated by route namespace only
+  - there is no authentication or permission system
+- Open question:
+  - when and how should Teacher/Station access control be introduced?
 
-## 2) 다중 기기 동기화 범위
-- 현황: 세션 데이터는 localStorage 기반
-- 질문: 여러 디바이스 스테이션 동기화를 서버로 전환할지
+## 2. Local Persistence to Server Migration
+- Current state:
+  - sessions use localStorage
+  - featured evidence uses a separate localStorage store
+- Open question:
+  - when should these stores move to server-backed persistence, and should they migrate together or separately?
 
-## 3) 런타임 상태 복구
-- 현황: 토론 진행 상태는 메모리 상태라 새로고침 시 초기화
-- 질문: 최소 복구 범위(phase, speaker, speechRunning)를 어디까지 보장할지
+## 3. Runtime Recovery Scope
+- Current state:
+  - live debate and presentation runtime state is mostly in memory
+  - refresh does not fully restore runtime state
+- Open question:
+  - what minimum recovery scope should be guaranteed later?
+  - examples: current phase, current speaker, timer state, group-ended state
 
-## 4) 리포트 데이터 전달 방식
-- 현황: `/station/report`에 query로 로그/메타 전달
-- 질문: URL 기반 유지 vs 서버 저장 후 ID 기반 조회 전환
+## 4. Station Report Transport
+- Current state:
+  - `/station/report` receives logs and metadata through query-string serialization
+- Open question:
+  - when should this move to saved report IDs or server-side lookup instead of URL payload transport?
 
-## 5) 설정 화면 기능 확장
-- 현황: CSV 업로드/스테이션 설정은 UI 중심
-- 질문: 실제 저장/검증/배포 플로우를 어떤 우선순위로 구현할지
+## 5. Ended Presentation Navigation
+- Current state:
+  - ended Presentation detail can render an AI-loading state and a profile-report style result
+  - session list ended action still routes to `/teacher/sessions/{id}/report`
+- Open question:
+  - should ended Presentation continue using the generic report route from the list, or should it reopen the presentation detail/report view directly?
 
-## 6) 분석/이벤트 수집
-- 현황: 화면별 이벤트 명세는 문서에 있으나 코드 계측은 제한적
-- 질문: MVP 단계에서 최소 이벤트 스키마를 어디까지 확정할지
+## 6. Report Persistence Model
+- Current state:
+  - Teacher debate report mixes derived/generate-on-read behavior with session context
+  - Presentation report is UI-derived
+- Open question:
+  - should reports remain computed views, or should they become persisted report entities?
+
+## 7. Settings Persistence
+- Current state:
+  - roster CSV upload is UI-only
+  - station role/delete actions are local UI state only
+- Open question:
+  - what parts of the settings screen should become real persistence flows first?
+
+## 8. Seed Data Reset Policy
+- Current state:
+  - seeded roster/events/stations exist alongside mutable local session and featured-evidence overlays
+- Open question:
+  - what reset/restore policy should govern:
+    - seed sessions
+    - featured evidence defaults
+    - debate events and demo examples
+
+## 9. Featured Evidence Ownership
+- Current state:
+  - featured evidence is stored outside session records
+  - it is effectively student-level local state
+- Open question:
+  - should featured evidence remain a separate student-level resource, or later become part of a report/evidence domain model?
