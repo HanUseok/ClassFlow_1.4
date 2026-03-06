@@ -18,6 +18,7 @@ interface LiveDebateScreenProps {
   interactionDisabled?: boolean
   freeSpeechType?: "질문" | "반박" | "동의" | null
   onFreeSpeechTypeChange?: (value: "질문" | "반박" | "동의" | null) => void
+  endDebateLabel?: string
 }
 
 const PHASE_TABS = [
@@ -45,6 +46,7 @@ export function LiveDebateScreen({
   interactionDisabled = false,
   freeSpeechType = null,
   onFreeSpeechTypeChange,
+  endDebateLabel = "토론 종료",
 }: LiveDebateScreenProps) {
   const [timeLeft, setTimeLeft] = useState(durationSeconds)
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null)
@@ -259,7 +261,7 @@ export function LiveDebateScreen({
             onClick={() => onEndDebate?.()}
             className="w-full rounded-md bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700"
           >
-            토론 종료
+            {endDebateLabel}
           </button>
         )
       ) : (

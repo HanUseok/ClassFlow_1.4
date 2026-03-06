@@ -20,6 +20,7 @@ type SessionStatus = "Pending" | "Live" | "Ended"
 const ORDERED_PHASES: OrderedPhaseKey[] = ["입론", "반론", "재반론", "마무리"]
 const FREE_MODE_COLUMNS = 4
 const FREE_MODE_FALLBACKS: Array<{
+  speechType: string
   argumentCard: string
   thinkingCard: string
   argumentKeyword: string

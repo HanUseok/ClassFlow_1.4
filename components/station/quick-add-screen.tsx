@@ -44,6 +44,8 @@ interface QuickAddScreenProps {
   showCards?: boolean
   speechType?: "질문" | "반박" | "동의" | null
   onSpeechTypeChange?: (value: "질문" | "반박" | "동의" | null) => void
+  completedDebateLabel?: string
+  onCompleteDebate?: () => void
 }
 
 type SpeechHistoryItem = {
@@ -101,6 +103,8 @@ export function QuickAddScreen({
   showCards = true,
   speechType = null,
   onSpeechTypeChange,
+  completedDebateLabel = "토론 종료",
+  onCompleteDebate,
 }: QuickAddScreenProps) {
   const [speechHistory, setSpeechHistory] = useState<SpeechHistoryItem[]>([])
   const isFreeMode = debateMode === "Free"
@@ -242,6 +246,10 @@ export function QuickAddScreen({
                   size="lg"
                   className="h-[300px] w-full gap-3 rounded-2xl bg-slate-800 text-xl font-bold text-white transition-all duration-500 hover:bg-slate-900"
                   onClick={() => {
+                    if (onCompleteDebate) {
+                      onCompleteDebate()
+                      return
+                    }
                     const path = buildSessionReportPath({
                       names: teamMembers.map((m) => m.name),
                       round,
@@ -259,7 +267,7 @@ export function QuickAddScreen({
                   disabled={speechControls.isRunning}
                 >
                   <FileText className="h-7 w-7" />
-                  토론 종료
+                  {completedDebateLabel}
                 </Button>
               ) : (
                 <Button
@@ -335,7 +343,10 @@ export function QuickAddScreen({
                 {cards.equippedArgument ? (
                   <button
                     type="button"
-                    onPointerDown={(e) => cards.handleCardPointerDown(e, cards.equippedArgument, { kind: "slot", slot: "argument" })}
+                    onPointerDown={(e) => {
+                      if (!cards.equippedArgument) return
+                      cards.handleCardPointerDown(e, cards.equippedArgument, { kind: "slot", slot: "argument" })
+                    }}
                     onClick={(e) => {
                       e.stopPropagation()
                       if (cards.suppressClickCardId === cards.equippedArgument?.id) return
@@ -384,7 +395,10 @@ export function QuickAddScreen({
                 {cards.equippedAccidentType ? (
                   <button
                     type="button"
-                    onPointerDown={(e) => cards.handleCardPointerDown(e, cards.equippedAccidentType, { kind: "slot", slot: "accidentType" })}
+                    onPointerDown={(e) => {
+                      if (!cards.equippedAccidentType) return
+                      cards.handleCardPointerDown(e, cards.equippedAccidentType, { kind: "slot", slot: "accidentType" })
+                    }}
                     onClick={(e) => {
                       e.stopPropagation()
                       if (cards.suppressClickCardId === cards.equippedAccidentType?.id) return

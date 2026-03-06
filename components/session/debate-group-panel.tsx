@@ -1,181 +1,114 @@
 "use client"
 
-import { Pause, Play, Square } from "lucide-react"
-import type { Session } from "@/lib/mock-data"
-import type { DebateGroup, PhaseKey } from "@/lib/domain/session"
-import { LiveDebateScreen } from "@/components/station/live-debate-screen"
-import { QuickAddScreen } from "@/components/station/quick-add-screen"
+import { useState } from "react"
+import type { PhaseKey } from "@/lib/domain/session"
 import { Button } from "@/components/ui/button"
+import { GroupAdjustmentModal } from "@/components/session/group-adjustment-modal"
+import { SpeechOrderEditorModal } from "@/components/session/speech-order-editor-modal"
 
 type TeamMember = { id: string; name: string; roleLabel: string; team: "team1" | "team2" }
 
-type DebateGroupPanelProps = {
-  group: DebateGroup
-  groupIndex: number
-  isOpen: boolean
-  phase: PhaseKey
-  phaseLabel: string
-  statusLabel: string
-  isRunning: boolean
-  isDebateFinished: boolean
-  hasPrevSpeaker: boolean
-  hasNextSpeaker: boolean
-  firstSpeaker: string
-  teamMembers: TeamMember[]
-  currentIndex: number
-  debateMode: "Ordered" | "Free"
-  session: Session
-  isTeacherGuided: boolean
-  viewMode: "progress" | "manage"
-  isSessionEnded: boolean
-  groupCount: number
-  groupLayout: string
-  onToggleOpen: () => void
-  onEndDebate: () => void
-  onSelectSpeaker: (idx: number) => void
-  onPhaseChange: (next: string) => void
-  onMoveOrderTo: (from: number, to: number) => void
-  onStartSpeech: () => void
-  onEndSpeech: () => void
-  onStartDebate: () => void
-  onToggleRunning: () => void
-  onPrevSpeaker: () => void
-  onNextSpeaker: () => void
-  showCards: boolean
-}
-
 export function DebateGroupPanel({
-  group,
-  groupIndex,
-  isOpen,
+  groupLabel,
   phase,
   phaseLabel,
   statusLabel,
-  isRunning,
-  isDebateFinished,
-  hasPrevSpeaker,
-  hasNextSpeaker,
-  firstSpeaker,
   teamMembers,
   currentIndex,
-  debateMode,
-  session,
-  isTeacherGuided,
-  viewMode,
+  remainingTimeLabel,
   isSessionEnded,
-  groupCount,
-  groupLayout,
-  onToggleOpen,
-  onEndDebate,
-  onSelectSpeaker,
-  onPhaseChange,
+  isGroupEnded,
   onMoveOrderTo,
-  onStartSpeech,
-  onEndSpeech,
-  onStartDebate,
-  onToggleRunning,
+  onSetSpeaker,
+  onSetPhase,
   onPrevSpeaker,
   onNextSpeaker,
-  showCards,
-}: DebateGroupPanelProps) {
+  onResumeTimer,
+  onEndGroupDebate,
+}: {
+  groupLabel: string
+  phase: PhaseKey
+  phaseLabel: string
+  statusLabel: string
+  teamMembers: TeamMember[]
+  currentIndex: number
+  remainingTimeLabel: string
+  isSessionEnded: boolean
+  isGroupEnded: boolean
+  onMoveOrderTo: (from: number, to: number) => void
+  onSetSpeaker: (idx: number) => void
+  onSetPhase: (phase: PhaseKey) => void
+  onPrevSpeaker: () => void
+  onNextSpeaker: () => void
+  onResumeTimer: () => void
+  onEndGroupDebate: () => void
+}) {
+  const [adjustOpen, setAdjustOpen] = useState(false)
+  const [orderOpen, setOrderOpen] = useState(false)
+  const currentSpeaker = teamMembers[currentIndex]
+
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-        <span className="font-semibold text-card-foreground">{groupIndex + 1}조</span>
-        <span className="text-muted-foreground">·</span>
-        <span className="text-card-foreground">{phaseLabel}</span>
-        <span className="text-muted-foreground">·</span>
-        <span className="text-card-foreground">{firstSpeaker}</span>
-        <span className="text-muted-foreground">·</span>
-        <span className="font-medium text-emerald-600">{statusLabel}</span>
-      </div>
-      <button
-        type="button"
-        onClick={onToggleOpen}
-        className="mt-3 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-card-foreground hover:bg-accent"
-      >
-        {isOpen ? `${groupIndex + 1}조 조정 닫기` : `${groupIndex + 1}조 조정 열기`}
-      </button>
-
-      {isOpen ? (
-        <div className="mt-4 border-t border-border pt-4">
-          <h2 className="mb-3 text-sm font-medium text-card-foreground">{groupIndex + 1}조 상세 조정</h2>
-          <LiveDebateScreen
-            round={1}
-            phase={phase}
-            durationSeconds={120}
-            isSpeechRunning={isRunning}
-            debateMode={debateMode}
-            teamMembers={teamMembers}
-            currentSpeakerIndex={currentIndex}
-            onEndDebate={onEndDebate}
-            onSelectSpeaker={onSelectSpeaker}
-            onPhaseChange={onPhaseChange}
-            onMoveOrderTo={onMoveOrderTo}
-          />
-
-          {viewMode === "progress" ? (
-            <div className="mt-3">
-              <QuickAddScreen
-                round={1}
-                phase={phase}
-                durationSeconds={120}
-                recordLimitPerRound={6}
-                debateMode={debateMode}
-                sessionId={session.id}
-                teacherGuided={isTeacherGuided}
-                sessionTitle={session.title}
-                sessionStatus={session.status}
-                groupCount={groupCount}
-                groupLayout={groupLayout}
-                argumentCards={session.debate?.argumentCards}
-                teamMembers={teamMembers}
-                currentSpeaker={teamMembers[currentIndex]}
-                onStartSpeech={onStartSpeech}
-                onEndSpeech={onEndSpeech}
-                debateFinished={isDebateFinished}
-                compact
-                showCards={showCards}
-              />
-            </div>
-          ) : (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {session.status === "Pending" ? (
-                <Button size="sm" onClick={onStartDebate}>
-                  토론 시작
-                </Button>
-              ) : null}
-              <Button variant="outline" size="sm" className="gap-2" onClick={onToggleRunning}>
-                {isRunning ? (
-                  <>
-                    <Pause className="h-4 w-4" />
-                    일시정지
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4" />
-                    재개
-                  </>
-                )}
-              </Button>
-              {hasPrevSpeaker ? (
-                <Button variant="outline" size="sm" onClick={onPrevSpeaker}>
-                  이전 발언자
-                </Button>
-              ) : null}
-              {hasNextSpeaker ? (
-                <Button variant="outline" size="sm" onClick={onNextSpeaker}>
-                  다음 발언자
-                </Button>
-              ) : null}
-              <Button size="sm" variant="destructive" className="gap-2" onClick={onEndDebate} disabled={isSessionEnded}>
-                <Square className="h-4 w-4" />
-                토론 종료
-              </Button>
-            </div>
-          )}
+    <>
+      <div className="rounded-lg border border-border bg-card p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-foreground">{groupLabel}</p>
+            <p className="mt-1 text-xs text-muted-foreground">현재 단계: {phaseLabel}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              현재 발언자: {currentSpeaker ? `${currentSpeaker.roleLabel} ${currentSpeaker.name}` : "-"}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">남은 시간: {remainingTimeLabel}</p>
+            <p className="mt-2 text-xs font-medium text-emerald-700">{statusLabel}</p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setAdjustOpen(true)} disabled={isSessionEnded}>
+            조 조정
+          </Button>
         </div>
-      ) : null}
-    </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={onPrevSpeaker} disabled={isSessionEnded || isGroupEnded}>
+            이전 발언자
+          </Button>
+          <Button variant="outline" size="sm" onClick={onNextSpeaker} disabled={isSessionEnded || isGroupEnded}>
+            다음 발언자
+          </Button>
+          <Button variant="outline" size="sm" onClick={onResumeTimer} disabled={isSessionEnded || isGroupEnded}>
+            타이머 재개
+          </Button>
+          <Button size="sm" variant="destructive" onClick={onEndGroupDebate} disabled={isSessionEnded || isGroupEnded}>
+            조 토론 종료
+          </Button>
+        </div>
+      </div>
+
+      <GroupAdjustmentModal
+        open={adjustOpen}
+        onOpenChange={setAdjustOpen}
+        groupLabel={groupLabel}
+        currentSpeakerId={currentSpeaker?.id}
+        currentPhase={phase}
+        teamMembers={teamMembers}
+        onOpenOrderEditor={() => setOrderOpen(true)}
+        onSetSpeaker={onSetSpeaker}
+        onSetPhase={onSetPhase}
+      />
+
+      <SpeechOrderEditorModal
+        open={orderOpen}
+        onOpenChange={setOrderOpen}
+        phaseLabel={phaseLabel}
+        round={1}
+        teamMembers={teamMembers}
+        onSave={(nextMembers) => {
+          const currentIds = teamMembers.map((member) => member.id)
+          nextMembers.forEach((member, nextIndex) => {
+            const from = currentIds.indexOf(member.id)
+            if (from !== nextIndex && from >= 0) {
+              onMoveOrderTo(from, nextIndex)
+            }
+          })
+        }}
+      />
+    </>
   )
 }

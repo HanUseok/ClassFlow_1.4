@@ -175,6 +175,11 @@ export default function SessionsPage() {
 	                    <Button asChild size="sm" variant="outline">
 	                      <Link href={detailHref}>{detailLabel}</Link>
 	                    </Button>
+                      {session.type === "Debate" && session.status === "Ended" ? (
+                        <Button asChild size="sm" variant="outline">
+                          <Link href={`/teacher/sessions/${session.id}/summary`}>수업 요약</Link>
+                        </Button>
+                      ) : null}
 
                     {canInlineEdit && isEditing ? (
                       <>

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { DashboardSpeechParticipationCard } from "@/components/dashboard-speech-participation-card"
 import { listDebateEvents, listStudents } from "@/lib/application/roster-service"
 import { useMockSessions } from "@/hooks/use-mock-sessions"
 import { DEADLINES } from "@/lib/deadlines"
@@ -15,6 +16,12 @@ import {
   getReportKindLabel,
   getReportKind,
 } from "@/lib/evidence-utils"
+import {
+  buildParticipationBuckets,
+  computeSpeechStats,
+  evidenceRecommendationScore,
+  getRecentDebateEvents,
+} from "@/lib/application/teacher-insights"
 import {
   readFeaturedEvidenceMap,
   subscribeFeaturedEvidence,
@@ -113,6 +120,9 @@ export default function DashboardPage() {
     () => buildStudentEvidenceSummaries({ students, evidenceItems, featuredMap }),
     [students, evidenceItems, featuredMap]
   )
+  const recentDebateEvents = useMemo(() => getRecentDebateEvents(events, sessions), [events, sessions])
+  const speechStats = useMemo(() => computeSpeechStats(recentDebateEvents, students), [recentDebateEvents, students])
+  const speechBuckets = useMemo(() => buildParticipationBuckets(speechStats), [speechStats])
   const prepared = useMemo(() => countPreparedStudents(summaries), [summaries])
 
   const watchGroups = useMemo(() => {
@@ -152,10 +162,12 @@ export default function DashboardPage() {
       evidenceItems.slice(0, 5).map((item) => {
         const insight = buildReportInsight(item)
         const keywordText = insight.keywords.slice(0, 3).join(", ")
+        const recommendation = evidenceRecommendationScore(item)
         return {
           item,
           insight,
           keywordText,
+          recommendation,
         }
       }),
     [evidenceItems]
@@ -172,7 +184,11 @@ export default function DashboardPage() {
         .filter((item) => !(featuredMap[item.event.studentId] ?? []).includes(item.event.id))
         .filter((item) => Boolean(item.event.note?.trim()))
         .slice(0, 3)
-        .map((item) => ({ item, insight: buildReportInsight(item) })),
+        .map((item) => ({
+          item,
+          insight: buildReportInsight(item),
+          recommendation: evidenceRecommendationScore(item),
+        })),
     [evidenceItems, featuredMap]
   )
 
@@ -305,6 +321,8 @@ export default function DashboardPage() {
         )}
       </section>
 
+      <DashboardSpeechParticipationCard buckets={speechBuckets} />
+
       <section className="rounded-xl border border-border bg-card p-5">
         <h2 className="text-base font-semibold text-foreground">최근 추가된 근거</h2>
         <div className="mt-2 flex flex-wrap gap-1.5">
@@ -324,7 +342,7 @@ export default function DashboardPage() {
           <p className="text-sm font-semibold text-foreground">오늘 바로 쓸 수 있는 근거 3개</p>
           {readyNowEvidence.length > 0 ? (
             <div className="mt-3 grid gap-2">
-              {readyNowEvidence.map(({ item, insight }) => {
+              {readyNowEvidence.map(({ item, insight, recommendation }) => {
                 const quality = qualityBadge(item)
                 return (
                   <div key={`ready-${item.id}`} className="rounded-md border border-border bg-background p-3">
@@ -346,6 +364,13 @@ export default function DashboardPage() {
                     <p className="mt-1 text-xs text-muted-foreground">
                       논거 {insight.argumentCard} · 사고 {insight.thinkingCard}
                     </p>
+                    {recommendation.recommended ? (
+                      <div className="mt-2">
+                        <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100">
+                          ⭐ 대표 사례 추천
+                        </Badge>
+                      </div>
+                    ) : null}
                     <div className="mt-2 flex flex-wrap gap-2">
                       <Button
                         size="sm"
@@ -368,7 +393,7 @@ export default function DashboardPage() {
         </div>
         {recentEvidenceDigest.length > 0 ? (
           <div className="mt-4 grid gap-2">
-            {recentEvidenceDigest.map(({ item, insight, keywordText }) => {
+            {recentEvidenceDigest.map(({ item, insight, keywordText, recommendation }) => {
               const quality = qualityBadge(item)
               return (
                 <Link
@@ -401,10 +426,15 @@ export default function DashboardPage() {
                   <p className="mt-1 text-xs text-muted-foreground">
                     키워드: {keywordText || "없음"}
                   </p>
-                  <div className="mt-1">
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${quality.tone}`}>
                       {quality.label}
                     </span>
+                    {recommendation.recommended ? (
+                      <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100">
+                        ⭐ 대표 사례 추천
+                      </Badge>
+                    ) : null}
                   </div>
                 </Link>
               )

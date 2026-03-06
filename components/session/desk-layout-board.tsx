@@ -37,13 +37,13 @@ function getSeatStudent(group: DebateGroup, side: Side, index: number) {
   return index === 0 ? group.moderator ?? null : null
 }
 
-function clearStudentEverywhere(groups: DebateGroup[], studentId: string) {
+function clearStudentEverywhere(groups: DebateGroup[], studentId: string): DebateGroup[] {
   return groups.map((group) => ({
     ...group,
     affirmative: group.affirmative.filter((student) => student.id !== studentId),
     negative: group.negative.filter((student) => student.id !== studentId),
-    moderator: group.moderator?.id === studentId ? undefined : group.moderator,
-  }))
+    moderator: group.moderator?.id === studentId ? undefined : group.moderator ?? undefined,
+  })) as DebateGroup[]
 }
 
 function placeStudent(group: DebateGroup, side: Side, index: number, student: Student | null): DebateGroup {

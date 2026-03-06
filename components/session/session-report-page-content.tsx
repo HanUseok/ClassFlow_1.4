@@ -6,7 +6,10 @@ import { useParams } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
 import { useMockSessions } from "@/hooks/use-mock-sessions"
 import { collectUniqueMembers } from "@/lib/domain/session"
+import { listDebateEvents } from "@/lib/application/roster-service"
+import { generateTeamDebateSummary } from "@/lib/application/teacher-insights"
 import { ProfileReportView, type ProfileReportProfile } from "@/components/report/profile-report-view"
+import { Badge } from "@/components/ui/badge"
 
 const ORDERED_PHASES = ["입론", "반론", "재반론", "마무리"] as const
 const FREE_COLUMNS = 4
@@ -33,6 +36,7 @@ export function SessionReportPageContent() {
   const params = useParams<{ id: string }>()
   const { sessions, hydrated } = useMockSessions()
   const session = sessions.find((item) => item.id === params.id)
+  const debateEvents = listDebateEvents()
 
   const groups = session?.debate?.groups ?? []
   const members = useMemo(() => {
@@ -41,6 +45,11 @@ export function SessionReportPageContent() {
   }, [session, groups])
 
   const isFreeMode = session?.type === "Debate" && (session.debate?.mode ?? "Ordered") === "Free"
+  const teamSummaries = useMemo(() => {
+    if (!session || session.type !== "Debate") return []
+    const sessionEvents = debateEvents.filter((event) => event.sessionId === session.id)
+    return generateTeamDebateSummary(sessionEvents, session)
+  }, [debateEvents, session])
 
   const profiles = useMemo<ProfileReportProfile[]>(() => {
     return members.map((member, memberIndex) => {
@@ -116,6 +125,39 @@ export function SessionReportPageContent() {
           {session.topic ? <p className="mt-1 text-sm text-muted-foreground">{session.topic}</p> : null}
         </div>
       </div>
+
+      {teamSummaries.length > 0 ? (
+        <section className="rounded-xl border border-border bg-card p-5">
+          <h2 className="text-base font-semibold text-foreground">Team Debate Summary</h2>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {teamSummaries.map((team) => (
+              <div key={team.teamId} className="rounded-lg border border-border p-4">
+                <p className="text-sm font-semibold text-foreground">{team.teamLabel} 토론 요약</p>
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">주요 주장</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {team.majorClaims.length > 0 ? team.majorClaims.map((item) => <Badge key={item} variant="outline">{item}</Badge>) : <span className="text-sm text-muted-foreground">없음</span>}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">주요 반박</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {team.majorRebuttals.length > 0 ? team.majorRebuttals.map((item) => <Badge key={item} variant="outline">{item}</Badge>) : <span className="text-sm text-muted-foreground">없음</span>}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">주요 개념</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {team.conceptTags.length > 0 ? team.conceptTags.map((item) => <Badge key={item} variant="secondary">{item}</Badge>) : <span className="text-sm text-muted-foreground">없음</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <ProfileReportView profiles={profiles} emptyMessage="리포트 대상 학생 정보가 없습니다." />
     </div>

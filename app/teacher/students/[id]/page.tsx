@@ -17,6 +17,12 @@ import {
   mapEvidenceToCompetency,
 } from "@/lib/evidence-utils"
 import {
+  checkRecordSimilarity,
+  evidenceRecommendationScore,
+  generateStudentRecordDraft,
+  getStudentPreparationStatus,
+} from "@/lib/application/teacher-insights"
+import {
   readFeaturedEvidenceMap,
   subscribeFeaturedEvidence,
   toggleFeaturedEvidence,
@@ -81,7 +87,7 @@ export default function StudentProfilePage({
       </Link>
 
       <div className="flex items-center gap-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
           <User className="h-5 w-5 text-muted-foreground" />
         </div>
         <div>
@@ -90,12 +96,12 @@ export default function StudentProfilePage({
         </div>
       </div>
 
-      <StudentEvidenceWorkspace studentId={student.id} />
+      <StudentEvidenceWorkspace studentId={student.id} studentClassId={student.classId} />
     </div>
   )
 }
 
-function StudentEvidenceWorkspace({ studentId }: { studentId: string }) {
+function StudentEvidenceWorkspace({ studentId, studentClassId }: { studentId: string; studentClassId: string }) {
   const allStudents = listStudents()
   const debateEvents = listDebateEvents()
   const { sessions } = useMockSessions()
@@ -123,6 +129,59 @@ function StudentEvidenceWorkspace({ studentId }: { studentId: string }) {
   const featuredIds = featuredMap[studentId] ?? []
   const featuredItems = evidenceItems.filter((item) => featuredIds.includes(item.event.id))
   const recentReportedItems = evidenceItems.slice(0, 5)
+  const recommendationMap = useMemo(
+    () =>
+      new Map(
+        evidenceItems.map((item) => {
+          const recommendation = evidenceRecommendationScore(item)
+          return [item.id, recommendation]
+        })
+      ),
+    [evidenceItems]
+  )
+  const preparationStatus = useMemo(
+    () =>
+      getStudentPreparationStatus({
+        evidenceCount: evidenceItems.length,
+        featuredEvidenceCount: featuredItems.length,
+      }),
+    [evidenceItems.length, featuredItems.length]
+  )
+  const studentDraft = useMemo(
+    () =>
+      generateStudentRecordDraft(featuredItems.length > 0 ? featuredItems : evidenceItems.slice(0, 2), {
+        id: studentId,
+        name: allStudents.find((item) => item.id === studentId)?.name ?? "학생",
+        classId: studentClassId,
+        className: allStudents.find((item) => item.id === studentId)?.className ?? "",
+      }, { topic: evidenceItems[0]?.session?.topic }),
+    [allStudents, evidenceItems, featuredItems, studentClassId, studentId]
+  )
+  const similarityWarnings = useMemo(() => {
+    const classStudents = allStudents.filter((student) => student.classId === studentClassId)
+    const classDrafts = classStudents.map((student) => {
+      const studentItems = buildEvidenceItems({
+        events: debateEvents,
+        sessions,
+        students: allStudents,
+      }).filter((item) => item.event.studentId === student.id)
+      const classFeaturedIds = featuredMap[student.id] ?? []
+      const classFeaturedItems = studentItems.filter((item) => classFeaturedIds.includes(item.event.id))
+      return generateStudentRecordDraft(
+        classFeaturedItems.length > 0 ? classFeaturedItems : studentItems.slice(0, 2),
+        student,
+        { topic: studentItems[0]?.session?.topic }
+      )
+    })
+
+    return checkRecordSimilarity(classDrafts)
+      .filter((warning) => warning.studentA === studentId || warning.studentB === studentId)
+      .slice(0, 3)
+  }, [allStudents, debateEvents, featuredMap, sessions, studentClassId, studentId])
+  const studentNameMap = useMemo(
+    () => new Map(allStudents.map((student) => [student.id, student.name])),
+    [allStudents]
+  )
 
   const grouped = useMemo(() => {
     const buckets = {
@@ -171,26 +230,38 @@ function StudentEvidenceWorkspace({ studentId }: { studentId: string }) {
     <div className="flex flex-col gap-6">
       <section className="rounded-xl border border-border bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-foreground">⭐ 대표 사례</h2>
+          <div>
+            <h2 className="text-base font-semibold text-foreground">세특 준비 상태</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {preparationStatus === "ready"
+                ? "준비 완료"
+                : preparationStatus === "needs_featured"
+                  ? "대표 사례 필요"
+                  : "근거 보강 필요"}
+            </p>
+          </div>
+          <Badge
+            variant="outline"
+            className={
+              preparationStatus === "ready"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : preparationStatus === "needs_featured"
+                  ? "border-amber-200 bg-amber-50 text-amber-700"
+                  : "border-rose-200 bg-rose-50 text-rose-700"
+            }
+          >
+            대표 사례 {featuredItems.length}개 · 근거 {evidenceItems.length}개
+          </Badge>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-border bg-card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-base font-semibold text-foreground">세특 작성 모드</h2>
           <Button variant="outline" onClick={() => setWritingMode((prev) => !prev)}>
-            세특 작성 모드
+            {writingMode ? "작성 모드 닫기" : "세특 작성 모드"}
           </Button>
         </div>
-
-        {featuredItems.length > 0 ? (
-          <div className="mt-4 grid gap-2">
-            {(showAllFeatured ? featuredItems : featuredItems.slice(0, 3)).map((item) => (
-              <EvidenceCard key={`featured-${item.id}`} item={item} featured onToggleFeatured={() => toggleFeaturedEvidence(studentId, item.event.id)} />
-            ))}
-            {featuredItems.length > 3 ? (
-              <Button variant="ghost" className="w-fit" onClick={() => setShowAllFeatured((prev) => !prev)}>
-                {showAllFeatured ? "접기" : `더보기 (${featuredItems.length - 3}개)`}
-              </Button>
-            ) : null}
-          </div>
-        ) : (
-          <p className="mt-4 text-sm text-muted-foreground">대표 사례가 아직 지정되지 않았습니다.</p>
-        )}
 
         {writingMode ? (
           <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
@@ -206,6 +277,30 @@ function StudentEvidenceWorkspace({ studentId }: { studentId: string }) {
               ) : null}
             </div>
             <p className="mt-2 text-xs text-amber-800">자동 생성이 아닌 참고 초안입니다. 문장 표현은 직접 수정하세요.</p>
+            <div className="mt-3 rounded-md border border-amber-200 bg-white p-3">
+              <p className="text-xs font-medium text-foreground">자동 생성 세특 문단</p>
+              <p className="mt-2 text-sm text-muted-foreground">{studentDraft.paragraph}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {studentDraft.keywords.map((keyword) => (
+                  <Badge key={keyword} variant="outline">
+                    {keyword}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            {similarityWarnings.length > 0 ? (
+              <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3">
+                <p className="text-xs font-medium text-rose-800">세특 유사도 경고</p>
+                <div className="mt-2 space-y-1 text-sm text-rose-900">
+                  {similarityWarnings.map((warning, index) => (
+                    <p key={`${warning.studentA}-${warning.studentB}-${index}`}>
+                      {studentNameMap.get(warning.studentA) ?? warning.studentA} / {studentNameMap.get(warning.studentB) ?? warning.studentB} · 유사도 {Math.round(warning.similarity * 100)}%
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             {featuredItems.length > 0 ? (
               <div className="mt-3 space-y-2">
@@ -237,7 +332,36 @@ function StudentEvidenceWorkspace({ studentId }: { studentId: string }) {
               <p className="mt-3 text-sm text-amber-900">대표 사례를 먼저 2~3개 지정해 주세요.</p>
             )}
           </div>
-        ) : null}
+        ) : (
+          <p className="mt-4 text-sm text-muted-foreground">대표 사례 1~2개를 기반으로 세특 초안을 생성할 수 있습니다.</p>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-border bg-card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-base font-semibold text-foreground">⭐ 대표 사례</h2>
+        </div>
+
+        {featuredItems.length > 0 ? (
+          <div className="mt-4 grid gap-2">
+            {(showAllFeatured ? featuredItems : featuredItems.slice(0, 3)).map((item) => (
+              <EvidenceCard
+                key={`featured-${item.id}`}
+                item={item}
+                featured
+                recommended={Boolean(recommendationMap.get(item.id)?.recommended)}
+                onToggleFeatured={() => toggleFeaturedEvidence(studentId, item.event.id)}
+              />
+            ))}
+            {featuredItems.length > 3 ? (
+              <Button variant="ghost" className="w-fit" onClick={() => setShowAllFeatured((prev) => !prev)}>
+                {showAllFeatured ? "접기" : `더보기 (${featuredItems.length - 3}개)`}
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-muted-foreground">대표 사례가 아직 지정되지 않았습니다.</p>
+        )}
       </section>
 
       <section className="rounded-xl border border-border bg-card p-5">
@@ -259,18 +383,21 @@ function StudentEvidenceWorkspace({ studentId }: { studentId: string }) {
             items={grouped.academic}
             featuredIds={featuredIds}
             studentId={studentId}
+            recommendationMap={recommendationMap}
           />
           <CompetencySection
             title="🧭 진로역량"
             items={grouped.career}
             featuredIds={featuredIds}
             studentId={studentId}
+            recommendationMap={recommendationMap}
           />
           <CompetencySection
             title="🤝 공동체역량"
             items={grouped.community}
             featuredIds={featuredIds}
             studentId={studentId}
+            recommendationMap={recommendationMap}
           />
           {grouped.unclassified.length > 0 ? (
             <CompetencySection
@@ -278,6 +405,7 @@ function StudentEvidenceWorkspace({ studentId }: { studentId: string }) {
               items={grouped.unclassified}
               featuredIds={featuredIds}
               studentId={studentId}
+              recommendationMap={recommendationMap}
             />
           ) : null}
         </div>
@@ -321,11 +449,13 @@ function CompetencySection({
   items,
   featuredIds,
   studentId,
+  recommendationMap,
 }: {
   title: string
   items: ReturnType<typeof buildEvidenceItems>
   featuredIds: string[]
   studentId: string
+  recommendationMap: Map<string, { evidenceId: string; recommendationScore: number; recommended: boolean }>
 }) {
   return (
     <div>
@@ -337,6 +467,7 @@ function CompetencySection({
               key={item.id}
               item={item}
               featured={featuredIds.includes(item.event.id)}
+              recommended={Boolean(recommendationMap.get(item.id)?.recommended)}
               onToggleFeatured={() => toggleFeaturedEvidence(studentId, item.event.id)}
             />
           ))}
@@ -351,10 +482,12 @@ function CompetencySection({
 function EvidenceCard({
   item,
   featured,
+  recommended,
   onToggleFeatured,
 }: {
   item: ReturnType<typeof buildEvidenceItems>[number]
   featured: boolean
+  recommended?: boolean
   onToggleFeatured: () => void
 }) {
   const keywords = extractKeywordsFromNote(item.event.note ?? "")
@@ -390,6 +523,11 @@ function EvidenceCard({
         <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
           {insight.reportLabel}
         </Badge>
+        {recommended ? (
+          <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100">
+            ⭐ 대표 사례 추천
+          </Badge>
+        ) : null}
         {item.session?.topic ? <span>주제 {item.session.topic}</span> : null}
         {item.session?.topic ? <span>·</span> : null}
         <span>논거 {insight.argumentCard}</span>
