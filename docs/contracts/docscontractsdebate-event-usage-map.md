@@ -2,27 +2,29 @@ Definition location
 
 mock-data.ts
 
-Candidate fields (to verify)
-
-id
-
-studentId
-
-sessionId
-
-timestamp
-
-speechType
-
-team
-
-note
-
-approved
+Actual type definition
 
 
 
-※ 실제 코드에서 확인 필요
+id: string
+
+sessionId: string
+
+round: number
+
+studentId: string
+
+studentName: string
+
+team: "Team 1" | "Team 2"
+
+speechType: SpeechType
+
+note?: string
+
+timestamp: string
+
+approved: boolean
 
 
 
